@@ -185,7 +185,16 @@ class Fixture {
         const inAlbum = location.pathname.includes('/album/');
         const index = fixture.ids.indexOf(id);
         if(inAlbum){
-          viewer.innerHTML = fixture.options.hideNavigation ? '<p>Unknown viewer</p>' : '<button id="previous" aria-label="'+fixture.labels.previous+'" '+(index===0?'disabled':'')+'>Previous</button><button id="next" aria-label="'+fixture.labels.next+'" '+(index===fixture.ids.length-1?'disabled':'')+'>Next</button>';
+          const tag = fixture.options.rolelessNavigation ? 'div' : 'button';
+          const endAttribute = tag === 'button' ? 'disabled' : 'aria-disabled="true"';
+          const hint = fixture.options.shortcutLabels;
+          const previousLabel = fixture.labels.previous + (hint ? ' (Left arrow)' : '');
+          const nextLabel = fixture.labels.next + (hint ? ' (Right arrow)' : '');
+          const hiddenStyle = fixture.options.hiddenControls ? ' style="visibility:hidden"' : '';
+          const previousName = (fixture.options.labelledBy ? 'aria-labelledby="previous-label"' : fixture.options.keyShortcuts ? 'aria-keyshortcuts="ArrowLeft"' : 'aria-label="'+previousLabel+'"') + hiddenStyle;
+          const nextName = (fixture.options.labelledBy ? 'aria-labelledby="next-label"' : fixture.options.keyShortcuts ? 'aria-keyshortcuts="ArrowRight"' : 'aria-label="'+nextLabel+'"') + hiddenStyle;
+          const referencedLabels = fixture.options.labelledBy ? '<span id="previous-label">'+fixture.labels.previous+'</span><span id="next-label">'+fixture.labels.next+'</span>' : '';
+          viewer.innerHTML = fixture.options.hideNavigation ? '<p>Unknown viewer</p>' : referencedLabels+'<'+tag+' id="previous" tabindex="0" '+previousName+' '+(index===0?endAttribute:'')+'>‹</'+tag+'><'+tag+' id="next" tabindex="0" '+nextName+' '+(index===fixture.ids.length-1?endAttribute:'')+'>›</'+tag+'>';
           return;
         }
         const archived = fixture.archived.includes(id);
@@ -200,6 +209,7 @@ class Fixture {
       }
       function step(direction){
         if(!location.pathname.includes('/album/'))return;
+        if(fixture.options.blockKeyboard)return;
         const index=fixture.ids.indexOf(currentId());
         const next=index+(direction==='ArrowRight'?1:-1);
         if(next<0||next>=fixture.ids.length)return;
@@ -239,6 +249,81 @@ test('album overview can open the first thumbnail and complete a scan', () => us
 test('single-photo album completes without keyboard navigation', () => using({ ids: ['p1'] }, async fixture => {
   assert.equal((await fixture.scan()).photos.length, 1);
   assert.equal(fixture.trustedKeys.length, 0);
+}));
+
+test('navigation without button roles uses its accessible labels', () => using({ rolelessNavigation: true }, async fixture => {
+  const job = await fixture.scan();
+  assert.equal(job.phase, 'ready');
+  assert.deepEqual(job.photos.map(photo => photo.id), ['p1', 'p2', 'p3']);
+}));
+
+test('navigation labels with keyboard hints are recognized', () => using({ shortcutLabels: true }, async fixture => {
+  const job = await fixture.scan();
+  assert.equal(job.phase, 'ready');
+  assert.equal(job.photos.length, 3);
+}));
+
+test('navigation supports aria-labelledby and language-neutral key shortcuts', async () => {
+  for (const options of [{ labelledBy: true }, { keyShortcuts: true }]) await using(options, async fixture => {
+    const job = await fixture.scan();
+    assert.equal(job.phase, 'ready');
+    assert.equal(job.photos.length, 3);
+  });
+});
+
+test('hidden hover controls cannot truncate the album to one photo', () => using({ hiddenControls: true }, async fixture => {
+  const job = await fixture.scan();
+  assert.equal(job.phase, 'ready');
+  assert.deepEqual(job.photos.map(photo => photo.id), ['p1', 'p2', 'p3']);
+}));
+
+test('unlabeled keyboard scan requires a matching album count before archiving', () => using({ hideNavigation: true }, async fixture => {
+  const job = await fixture.scan();
+  assert.equal(job.phase, 'review');
+  assert.equal(job.scanComplete, false);
+  assert.deepEqual(job.photos.map(photo => photo.id), ['p1', 'p2', 'p3']);
+  const blocked = await fixture.command({ type: 'AA_ARCHIVE', jobId: job.id });
+  assert.equal(blocked.ok, false);
+  const mismatch = await fixture.command({ type: 'AA_CONFIRM_SCAN', jobId: job.id, expectedCount: 4 });
+  assert.equal(mismatch.ok, false);
+  assert.match(mismatch.error, /does not match/);
+  const confirmed = await fixture.command({ type: 'AA_CONFIRM_SCAN', jobId: job.id, expectedCount: 3 });
+  assert.equal(confirmed.ok, true);
+  assert.equal(confirmed.job.scanComplete, true);
+  assert.deepEqual(fixture.attempts, []);
+  assert.equal((await fixture.archive()).phase, 'done');
+}));
+
+test('a keyboard that does not move cannot falsely confirm the whole album', () => using({ hideNavigation: true, blockKeyboard: true }, async fixture => {
+  const job = await fixture.scan();
+  assert.equal(job.phase, 'review');
+  assert.equal(job.scanComplete, false);
+  assert.deepEqual(job.photos.map(photo => photo.id), ['p2']);
+  const confirmation = await fixture.command({ type: 'AA_CONFIRM_SCAN', jobId: job.id, expectedCount: 3 });
+  assert.equal(confirmation.ok, false);
+  assert.equal(fixture.store[A.jobKey].scanComplete, false);
+  assert.deepEqual(fixture.attempts, []);
+}, '/album/a/photo/p2'));
+
+test('popup count review blocks mismatches and unlocks the confirmed scan', () => using({ ids: ['p1'], initialJob: {
+  id: 'review-job', sourceTabId: 1, phase: 'review', scanComplete: false, account: '', albumId: 'a', requiresCountConfirmation: true,
+  message: 'Collected one photo with arrow keys.', photos: [{ id: 'p1', url: 'https://photos.google.com/photo/p1', status: 'pending' }],
+} }, async fixture => {
+  const popup = await fixture.context.newPage();
+  popup.on('pageerror', error => fixture.errors.push(error.message));
+  await popup.goto('https://extension-fixture.invalid/popup.html');
+  await popup.locator('#review').waitFor({ state: 'visible' });
+  assert.equal(await popup.locator('#archive').isDisabled(), true);
+  await popup.locator('#expectedCount').fill('2');
+  await popup.locator('#confirmScan').click();
+  await popup.waitForFunction(() => document.getElementById('error').textContent.includes('does not match'));
+  assert.equal(await popup.locator('#archive').isDisabled(), true);
+  await popup.locator('#expectedCount').fill('1');
+  await popup.locator('#confirmScan').click();
+  await popup.waitForFunction(() => !document.getElementById('archive').disabled);
+  assert.equal(await popup.locator('#review').isVisible(), false);
+  assert.deepEqual(fixture.attempts, []);
+  await popup.close();
 }));
 
 test('archiving verifies every photo after a viewer closes and preserves the album', () => using({ navigateAfterArchive: true }, async fixture => {

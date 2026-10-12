@@ -12,23 +12,33 @@
     return element.isConnected && !element.closest('[hidden],[aria-hidden="true"]') && style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
   }
   function disabled(element) {
-    return element.disabled || element.getAttribute('aria-disabled') === 'true' || Boolean(element.closest('[inert]'));
+    return element.disabled || Boolean(element.closest('[aria-disabled="true"],[disabled],[inert]'));
   }
-  function controls() {
+  function controls(forNavigation = false) {
     const found = [];
     const roots = [document];
     for (let index = 0; index < roots.length && index < 100; index++) {
       const root = roots[index];
-      found.push(...root.querySelectorAll('button,[role="button"],[role="menuitem"]'));
+      const selector = 'button,[role="button"],[role="menuitem"]' + (forNavigation ? ',[aria-label],[aria-labelledby],[aria-keyshortcuts],[data-tooltip],[title]' : '');
+      found.push(...root.querySelectorAll(selector));
       for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot);
     }
     return [...new Set(found)];
   }
   function names(element) {
-    return [element.getAttribute('aria-label'), element.getAttribute('title'), element.innerText || element.textContent].filter(Boolean);
+    const scope = element.getRootNode();
+    const referenced = (element.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(id => (scope.getElementById?.(id) || document.getElementById(id))?.textContent || '').join(' ');
+    return [element.getAttribute('aria-label'), referenced, element.getAttribute('title'), element.getAttribute('data-tooltip'), element.innerText || element.textContent].filter(Boolean);
   }
   function matching(type, onlyVisible = true) {
-    return controls().filter(element => (!onlyVisible || visible(element)) && names(element).some(name => A.matches(type, name)));
+    const forNavigation = type === 'previous' || type === 'next';
+    return controls(forNavigation).filter(element => {
+      if (onlyVisible && !visible(element)) return false;
+      if (names(element).some(name => A.matches(type, name))) return true;
+      if (!forNavigation) return false;
+      const keys = (element.getAttribute('aria-keyshortcuts') || '').toLowerCase().split(/\s+/);
+      return keys.includes(type === 'previous' ? 'arrowleft' : 'arrowright');
+    });
   }
   function unique(type) {
     const found = matching(type).filter(element => !disabled(element));
@@ -37,11 +47,11 @@
   }
   function navigation(type) {
     const candidates = matching(type, false);
-    if (candidates.length) return candidates.some(element => visible(element) && !disabled(element)) ? 'ready' : 'end';
-    // Photos may omit the edge button entirely. Only infer an edge when the
-    // opposite recognized navigation control proves this is the photo viewer.
-    const opposite = matching(type === 'next' ? 'previous' : 'next', false);
-    return opposite.length ? 'end' : 'unknown';
+    if (candidates.some(element => visible(element) && !disabled(element))) return 'ready';
+    if (candidates.length && candidates.every(disabled)) return 'end';
+    // Hidden hover controls or an omitted arrow do not prove an album edge.
+    // The background may probe the keyboard, then require an album-count check.
+    return 'unknown';
   }
   function snapshot() {
     return { route: A.route(location.href), url: location.href, title: document.querySelector('h1')?.innerText?.trim() || document.title, previous: navigation('previous'), next: navigation('next') };

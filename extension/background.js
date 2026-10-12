@@ -35,17 +35,21 @@ async function page(tabId, type, extra = {}) {
   }
   return reply;
 }
-async function waitSnapshot(tabId, predicate, timeout = 7000) {
+async function waitSnapshot(tabId, predicate, timeout = 7000, allowStableRoute = false) {
   const deadline = Date.now() + timeout;
   let lastError = null;
+  let received = false;
   while (Date.now() < deadline) {
     let value;
     try {
       value = await page(tabId, 'AA_PAGE_SNAPSHOT');
+      received = true;
+      lastError = null;
     } catch (error) { lastError = error; }
     if (value && predicate(value)) return value;
     await sleep(100);
   }
+  if (allowStableRoute && received && !lastError) return null;
   throw new Error(lastError?.message || 'Google Photos did not finish loading the expected photo.');
 }
 async function attach(operation, tabId) {
@@ -77,13 +81,20 @@ async function move(operation, job, current, direction) {
   checkpoint(operation);
   ensureAlbum(current, job);
   if (current[direction] === 'end') return null;
-  if (current[direction] !== 'ready') throw new Error('The Photos navigation controls were not recognized. Check the interface language and reload the album.');
+  const unlabeled = current[direction] === 'unknown';
+  if (current[direction] !== 'ready' && !unlabeled) throw new Error('The photo viewer did not provide a navigation state. Reload the album.');
   await arrow(operation, direction);
   const next = await waitSnapshot(operation.sourceTabId, value => {
     checkpoint(operation);
     ensureAlbum(value, job);
     return value.route.photoId !== current.route.photoId;
-  });
+  }, unlabeled ? 3500 : 7000, unlabeled);
+  if (!next) {
+    // A stationary URL without recognized controls might be an album edge or
+    // an ignored key. Keep the inventory unconfirmed until its count is checked.
+    job.requiresCountConfirmation = true;
+    return null;
+  }
   await sleep(250);
   const settled = await page(operation.sourceTabId, 'AA_PAGE_SNAPSHOT');
   ensureAlbum(settled, job);
@@ -109,7 +120,9 @@ async function scan(operation, job) {
       rewound.add(current.route.photoId);
       job.message = 'Finding the first photo in the album…';
       await save(job);
-      current = await move(operation, job, current, 'previous');
+      const previous = await move(operation, job, current, 'previous');
+      if (!previous) break;
+      current = previous;
     }
     const seen = new Set();
     while (current) {
@@ -125,9 +138,9 @@ async function scan(operation, job) {
       current = await move(operation, job, current, 'next');
     }
     checkpoint(operation);
-    job.scanComplete = true;
-    job.phase = 'ready';
-    job.message = `Ready to archive ${job.photos.length} album photo${job.photos.length === 1 ? '' : 's'}.`;
+    job.scanComplete = !job.requiresCountConfirmation;
+    job.phase = job.scanComplete ? 'ready' : 'review';
+    job.message = job.scanComplete ? `Ready to archive ${job.photos.length} album photo${job.photos.length === 1 ? '' : 's'}.` : `Collected ${job.photos.length} photos using arrow keys. Enter the album's total photo count to confirm that the scan includes the entire album.`;
     await save(job);
   } catch (error) {
     job.phase = operation.stop ? 'stopped' : 'error';
@@ -254,6 +267,21 @@ async function startArchive(jobId) {
     return { job };
   } catch (error) { if (active === operation) active = null; throw error; }
 }
+async function confirmScan(jobId, expectedCount) {
+  if (active) throw new Error('Wait for the scan to stop before confirming its count.');
+  const job = await readJob();
+  if (!job || job.id !== jobId || job.phase !== 'review') throw new Error('There is no current scan waiting for a count check.');
+  if (!Number.isInteger(expectedCount) || expectedCount < 1 || expectedCount !== job.photos.length) {
+    throw new Error(`The album count does not match the ${job.photos.length} scanned photos. Check that arrow-key navigation works and scan again; nothing has been archived.`);
+  }
+  job.confirmedAlbumCount = expectedCount;
+  job.scanComplete = true;
+  job.phase = 'ready';
+  job.error = null;
+  job.message = `Album count confirmed: ready to archive ${job.photos.length} photos.`;
+  await save(job);
+  return { job };
+}
 async function stop() {
   if (!active) return { stopped: false };
   active.stop = true;
@@ -264,13 +292,14 @@ async function stop() {
   return { stopped: true };
 }
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (!['AA_GET_JOB', 'AA_SCAN', 'AA_ARCHIVE', 'AA_STOP'].includes(message?.type)) return;
+  if (!['AA_GET_JOB', 'AA_SCAN', 'AA_CONFIRM_SCAN', 'AA_ARCHIVE', 'AA_STOP'].includes(message?.type)) return;
   if (sender.id !== chrome.runtime.id || sender.tab) { reply({ ok: false, error: 'Use the extension popup to control album archiving.' }); return; }
   (async () => {
     await boot;
     switch (message.type) {
       case 'AA_GET_JOB': return { job: await readJob(), running: Boolean(active) };
       case 'AA_SCAN': return startScan(message.tabId);
+      case 'AA_CONFIRM_SCAN': return confirmScan(message.jobId, message.expectedCount);
       case 'AA_ARCHIVE': return startArchive(message.jobId);
       case 'AA_STOP': return stop();
     }

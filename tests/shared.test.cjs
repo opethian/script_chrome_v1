@@ -21,6 +21,9 @@ test('localized archive labels are exact and cannot select delete or unarchive',
   for (const label of ['Archive', 'Arşivle', 'Arkivera', 'Archivieren', 'Archiver']) assert.equal(A.matches('archive', label), true);
   for (const label of ['Unarchive', 'Remove from archive', 'Delete', 'Move to trash', 'Archive and delete']) assert.equal(A.matches('archive', label), false);
   assert.equal(A.matches('unarchive', 'Arşivden çıkar'), true);
+  assert.equal(A.matches('next', 'Next photo (Right arrow)'), true);
+  assert.equal(A.matches('previous', 'Önceki fotoğraf (Sol ok)'), true);
+  assert.equal(A.matches('archive', 'Archive and delete (Shift+A)'), false);
 });
 test('in-flight operations are counted as uncertain, never archived', () => {
   assert.deepEqual(A.counts({ photos: [{ status: 'archived' }, { status: 'already-archived' }, { status: 'pending' }, { status: 'processing' }, { status: 'uncertain' }] }), { total: 5, archived: 1, alreadyArchived: 1, pending: 1, uncertain: 2 });

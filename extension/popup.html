@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header><span class="mark" aria-hidden="true">▣</span><div><h1>Album Archiver</h1><p>Google Photos · v1.0</p></div></header>
+  <header><span class="mark" aria-hidden="true">▣</span><div><h1>Album Archiver</h1><p>Google Photos · v1.0.1</p></div></header>
   <p class="intro">Archive the photos in an album. Photos stay in the album and are hidden from the main Photos feed.</p>
   <section aria-labelledby="scan-heading">
     <h2 id="scan-heading">1. Scan your album</h2>
@@ -25,6 +25,11 @@
     <p id="status" role="status" aria-live="polite">Open your Google Photos album to begin.</p>
     <dl><div><dt>Scanned</dt><dd id="total">0</dd></div><div><dt>Archived</dt><dd id="verified">0</dd></div><div><dt>Already archived</dt><dd id="already">0</dd></div><div><dt>Pending</dt><dd id="pending">0</dd></div><div><dt>Uncertain</dt><dd id="uncertain">0</dd></div></dl>
     <p id="error" role="alert" hidden></p>
+    <div id="review" hidden>
+      <label for="expectedCount">Total photo count shown in your Google Photos album</label>
+      <input id="expectedCount" type="number" inputmode="numeric" min="1" step="1" placeholder="Enter the album total">
+      <button id="confirmScan" disabled>Confirm album count</button>
+    </div>
     <button id="export" class="secondary" disabled>Download progress report</button>
   </section>
   <p class="footnote">One confirmation per batch. Stop prevents the next photo; an action already sent may finish. Try a small album first. This version has been tested with simulated Photos pages; live Google Photos verification is still needed.</p>

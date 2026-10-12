@@ -4,17 +4,20 @@ A plain JavaScript Chrome Manifest V3 extension that scans a Google Photos album
 
 ## Install the extension
 
-1. [Download the extension ZIP](https://github.com/opethian/script_chrome_v1/raw/refs/heads/main/downloads/photos-album-archiver-v1.0.0.zip) and unzip it. If the direct link does not download, open the file in the repository's `downloads` folder and select **Download raw file**.
+1. [Download the extension ZIP](https://github.com/opethian/script_chrome_v1/raw/refs/heads/main/downloads/photos-album-archiver-v1.0.1.zip) and unzip it. If the direct link does not download, open the file in the repository's `downloads` folder and select **Download raw file**.
 2. Open `chrome://extensions` in Chrome.
 3. Enable **Developer mode**, click **Load unpacked**, and select the unzipped folder containing `manifest.json`.
 4. Reload any Google Photos tabs that were already open.
 
 When working from this repository, load the `extension` directory instead. No build or package installation is needed to use the extension.
 
+When updating from v1.0.0, disable the old extension, load the new v1.0.1 folder, and reload Google Photos. The popup header should show v1.0.1. Both English and Turkish Google Photos interfaces are supported; changing language is not required for the keyboard scan fallback.
+
 ## Use it
 
 1. In your signed-in Google Photos account, open an album, then open any photo inside that album.
-2. Open the extension popup and click **Scan album**. The scan navigates to the first photo and records photo IDs through the end of the album. It makes no archive changes during scanning.
+2. Open the extension popup and click **Scan album**. The scan navigates to the first photo and records photo IDs through the end of the album. It makes no archive changes during scanning. If the navigation controls are not recognized, it probes the left/right arrow keys instead. Hidden hover controls are not assumed to mark the end of an album.
+   If the scan requests a count check, read the total photo count in your Google Photos album, enter it in the popup, and click **Confirm album count**. The count must equal the collected list before archiving is enabled. If they differ, scan again; the extension does not assume that an ignored key means the album was fully scanned.
 3. Review the scanned count. Click **Archive scanned photos** and confirm the batch once.
 4. A separate working tab opens. Keep both that tab and the original album tab open. Let the extension work without navigating either tab.
 5. Watch progress in the popup. **Stop** prevents work on the next photo; an action already sent can finish. Reopen the popup whenever needed; the job runs in the background.

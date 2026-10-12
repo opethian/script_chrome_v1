@@ -9,3 +9,4 @@ button:hover:not(:disabled) { background: #1f4096; } button:disabled { opacity: 
 .secondary { background: #e6eaf2; color: #26354e; } .secondary:hover:not(:disabled) { background: #d7deea; }
 .report { padding: 12px; border: 1px solid #dfe5ef; background: white; border-radius: 10px; } dl { margin: 10px 0; } dl div { display: flex; justify-content: space-between; } dd { margin: 0; font-weight: 650; }
 #status { overflow-wrap: anywhere; } #error { color: #9a2631; overflow-wrap: anywhere; } .footnote { color: #61708b; font-size: 11px; margin-bottom: 0; }
+#review { border-top: 1px solid #dfe5ef; margin-top: 12px; padding-top: 10px; } #review label { display: block; font-weight: 600; } #expectedCount { box-sizing: border-box; width: 100%; margin: 6px 0; padding: 9px; border: 1px solid #b8c4d7; border-radius: 6px; font: inherit; }

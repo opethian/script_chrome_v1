@@ -1,8 +1,8 @@
 (function (root) {
   'use strict';
   const labels = {
-    previous: ['Previous photo', 'Previous', 'Önceki fotoğraf', 'Önceki', 'Föregående foto', 'Föregående', 'Vorheriges Foto', 'Précédent', 'Photo précédente'],
-    next: ['Next photo', 'Next', 'Sonraki fotoğraf', 'Sonraki', 'Nästa foto', 'Nästa', 'Nächstes Foto', 'Suivant', 'Photo suivante'],
+    previous: ['Previous photo', 'Previous image', 'Previous item', 'Go to previous photo', 'Previous', 'Önceki fotoğraf', 'Önceki resim', 'Önceki öğe', 'Önceki', 'Föregående foto', 'Föregående', 'Vorheriges Foto', 'Précédent', 'Photo précédente'],
+    next: ['Next photo', 'Next image', 'Next item', 'Go to next photo', 'Next', 'Sonraki fotoğraf', 'Sonraki resim', 'Sonraki öğe', 'Sonraki', 'Nästa foto', 'Nästa', 'Nächstes Foto', 'Suivant', 'Photo suivante'],
     more: ['More options', 'More', 'More actions', 'Diğer seçenekler', 'Diğer', 'Fler alternativ', 'Weitere Optionen', 'Autres options'],
     archive: ['Archive', 'Archive photo', 'Archive photos', 'Move to archive', 'Arşivle', 'Arşive taşı', 'Arkivera', 'Flytta till arkivet', 'Archivieren', 'Ins Archiv verschieben', 'Archiver'],
     unarchive: ['Unarchive', 'Unarchive photo', 'Unarchive photos', 'Remove from archive', 'Arşivden çıkar', 'Arşivden kaldır', 'Avarkivera', 'Ta bort från arkivet', 'Aus Archiv entfernen', 'Aus dem Archiv entfernen', 'Désarchiver'],
@@ -33,7 +33,15 @@
       uncertain: photos.filter(photo => photo.status === 'uncertain' || photo.status === 'processing').length,
     };
   }
-  const api = { route, counts, normalize, labels, matches: (type, value) => normalized[type]?.has(normalize(value)) || false, jobKey: 'albumArchiverJob' };
+  function matches(type, value) {
+    const label = normalize(value);
+    if (normalized[type]?.has(label)) return true;
+    // Navigation tooltips may append a keyboard hint; archive actions still
+    // require an exact label, so Archive cannot match Unarchive or Delete.
+    if (type === 'previous' || type === 'next') return normalized[type].has(label.replace(/\s*(?:\([^)]*\)|\[[^\]]*\])$/, '').trim());
+    return false;
+  }
+  const api = { route, counts, normalize, labels, matches, jobKey: 'albumArchiverJob' };
   root.AlbumArchiver = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);

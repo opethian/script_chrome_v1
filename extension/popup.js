@@ -20,6 +20,7 @@ async function refresh() {
   refreshing = true;
   try {
     const state = await send('AA_GET_JOB');
+    if (job?.id !== state.job?.id) $('expectedCount').value = '';
     job = state.job;
     running = state.running;
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -37,15 +38,22 @@ async function refresh() {
     $('archive').textContent = count.pending ? `Archive ${count.pending} scanned photo${count.pending === 1 ? '' : 's'}` : 'Archive scanned photos';
     $('stop').disabled = !running || requestPending;
     $('export').disabled = !job;
+    $('review').hidden = job?.phase !== 'review';
+    $('expectedCount').disabled = running || requestPending;
+    updateCountButton();
     if (job?.error) showError(job.error);
   } catch (error) { showError(error.message); }
   finally { refreshing = false; }
+}
+function updateCountButton() {
+  const count = Number($('expectedCount').value);
+  $('confirmScan').disabled = running || requestPending || job?.phase !== 'review' || !Number.isInteger(count) || count < 1;
 }
 async function action(callback) {
   if (requestPending) return;
   requestPending = true;
   showError(null);
-  for (const id of ['scan', 'archive', 'stop']) $(id).disabled = true;
+  for (const id of ['scan', 'archive', 'stop', 'confirmScan']) $(id).disabled = true;
   try { await callback(); }
   catch (error) { showError(error.message); }
   finally { requestPending = false; await refresh(); }
@@ -64,6 +72,11 @@ $('archive').addEventListener('click', () => action(async () => {
 $('stop').addEventListener('click', () => action(async () => {
   await send('AA_STOP');
   $('status').textContent = 'Stop requested. Finishing the current check…';
+}));
+$('expectedCount').addEventListener('input', updateCountButton);
+$('confirmScan').addEventListener('click', () => action(async () => {
+  if (!job) throw new Error('Scan an album first.');
+  await send('AA_CONFIRM_SCAN', { jobId: job.id, expectedCount: Number($('expectedCount').value) });
 }));
 $('export').addEventListener('click', () => {
   if (!job) return;
