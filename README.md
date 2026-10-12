@@ -4,14 +4,14 @@ A plain JavaScript Chrome Manifest V3 extension that scans a Google Photos album
 
 ## Install the extension
 
-1. [Download the extension ZIP](https://github.com/opethian/script_chrome_v1/raw/refs/heads/main/downloads/photos-album-archiver-v1.0.1.zip) and unzip it. If the direct link does not download, open the file in the repository's `downloads` folder and select **Download raw file**.
+1. [Download the extension ZIP](https://github.com/opethian/script_chrome_v1/raw/refs/heads/main/downloads/photos-album-archiver-v1.0.2.zip) and unzip it. If the direct link does not download, open the file in the repository's `downloads` folder and select **Download raw file**.
 2. Open `chrome://extensions` in Chrome.
 3. Enable **Developer mode**, click **Load unpacked**, and select the unzipped folder containing `manifest.json`.
 4. Reload any Google Photos tabs that were already open.
 
 When working from this repository, load the `extension` directory instead. No build or package installation is needed to use the extension.
 
-When updating from v1.0.0, disable the old extension, load the new v1.0.1 folder, and reload Google Photos. The popup header should show v1.0.1. Both English and Turkish Google Photos interfaces are supported; changing language is not required for the keyboard scan fallback.
+When updating from v1.0.0 or v1.0.1, disable the old extension, load the new v1.0.2 folder, and reload Google Photos. The popup header should show v1.0.2. Both English and Turkish Google Photos interfaces are supported; changing language is not required for the keyboard scan fallback.
 
 ## Use it
 
@@ -24,6 +24,8 @@ When updating from v1.0.0, disable the old extension, load the new v1.0.1 folder
 6. Check Google Photos **Archive** after a small test run before using a large album.
 
 Already-archived photos are skipped. A photo counts as archived only when its native menu subsequently offers **Unarchive / Remove from archive** after the same photo ID is reopened. A click or disappearing viewer is not counted as success. If a result is uncertain, processing stops. Check that photo manually, then scan again; uncertain operations are never retried automatically. Pending photos can be resumed after a clean stop. Restarting Chrome interrupts the job and does not automatically resume it.
+
+Opening a photo or video and its menu in the working tab is part of the archive operation. Version 1.0.2 recognizes Archive and Unarchive labels even when a separate keyboard-shortcut caption is rendered in the same row, including Turkish **Arşivle · Üst Karakter+A**. It also supports clickable rows inside the menu that lack a button role. Shortcut text does not allow a different command such as Delete or Unarchive to be mistaken for Archive.
 
 The popup can download a local progress report containing album and photo URLs. The extension makes no deletion requests and uploads no reports. Photos' own web interface handles the archive operation in the signed-in account.
 

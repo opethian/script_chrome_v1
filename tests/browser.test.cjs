@@ -199,7 +199,16 @@ class Fixture {
         }
         const archived = fixture.archived.includes(id);
         const label = archived ? fixture.labels.unarchive : fixture.labels.archive;
-        viewer.innerHTML = '<button id="more" aria-label="'+fixture.labels.more+'">More</button><div id="menu" role="menu" hidden><button id="archive-action" role="menuitem" aria-label="'+(fixture.options.misleadingArchive?'Delete':label)+'">'+label+'</button>'+(fixture.options.ambiguousArchive?'<button role="menuitem" aria-label="'+label+'">'+label+'</button>':'')+'</div>';
+        const actionTag = fixture.options.rolelessMenu ? 'div' : 'button';
+        const actionRole = fixture.options.rolelessMenu ? 'tabindex="0" jsaction="click:fixture"' : 'role="menuitem"';
+        const shortcut = fixture.options.language === 'tr' ? 'Üst Karakter+A' : 'Shift+A';
+        const actionName = fixture.options.misleadingArchive ? 'aria-label="Delete"' : fixture.options.menuShortcuts ? '' : 'aria-label="'+label+'"';
+        const caption = fixture.options.compoundArchive ? '<span>Archive</span><span> and delete</span>' : '<span>'+label+'</span>';
+        const icon = fixture.options.decorativeIcon ? '<span aria-hidden="true">archive</span>' : '';
+        const rowText = fixture.options.menuShortcuts ? icon+caption+'<span class="shortcut">'+shortcut+'</span>' : label;
+        const unrelated = fixture.options.menuShortcuts ? '<button role="menuitem" id="download">İndir<span>Üst Karakter+D</span></button><button role="menuitem" id="add-album">Albüme ekle</button><button role="menuitem" id="locked-folder">Kilitli Klasöre taşı</button>' : '';
+        viewer.innerHTML = (fixture.options.video ? '<video controls></video>' : '')+'<button id="more" aria-label="'+fixture.labels.more+'">More</button><div id="menu" role="menu" hidden>'+unrelated+'<'+actionTag+' id="archive-action" '+actionRole+' '+actionName+'>'+rowText+'</'+actionTag+'>'+(fixture.options.ambiguousArchive?'<button role="menuitem" aria-label="'+label+'">'+label+'</button>':'')+'</div>';
+        for (const name of ['download','add-album','locked-folder']) { const control=document.getElementById(name); if(control)control.onclick=()=>window.__fixtureBridge({action:'archive',id:'WRONG:'+name}); }
         document.getElementById('more').onclick=()=>{const m=document.getElementById('menu');m.hidden=!m.hidden;};
         document.getElementById('archive-action').onclick=async()=>{
           if(archived){ await window.__fixtureBridge({action:'archive',id:'UNARCHIVE:'+id}); return; }
@@ -342,6 +351,37 @@ test('already archived photos are verified without invoking Unarchive', () => us
   assert.equal(job.phase, 'done');
   assert.equal(A.counts(job).alreadyArchived, 2);
   assert.deepEqual(fixture.attempts, ['p2']);
+}));
+
+test('Turkish video menu separates Archive from its Shift+A caption and verifies the result', () => using({ language: 'tr', ids: ['p1','p2'], archived: ['p2'], video: true, menuShortcuts: true, decorativeIcon: true }, async fixture => {
+  await fixture.scan();
+  const job = await fixture.archive();
+  assert.equal(job.phase, 'done', job.error);
+  assert.equal(A.counts(job).archived, 1);
+  assert.equal(A.counts(job).alreadyArchived, 1);
+  assert.deepEqual(fixture.attempts, ['p1']);
+}));
+
+test('an English menu label joined directly to its shortcut is recognized', () => using({ ids: ['p1'], menuShortcuts: true }, async fixture => {
+  await fixture.scan();
+  const job = await fixture.archive();
+  assert.equal(job.phase, 'done', job.error);
+  assert.deepEqual(fixture.attempts, ['p1']);
+}));
+
+test('clickable menu rows without button roles still target the exact Archive command', () => using({ ids: ['p1'], rolelessMenu: true, menuShortcuts: true }, async fixture => {
+  await fixture.scan();
+  const job = await fixture.archive();
+  assert.equal(job.phase, 'done', job.error);
+  assert.deepEqual(fixture.attempts, ['p1']);
+}));
+
+test('a compound Archive and Delete row with a shortcut is never selected', () => using({ ids: ['p1'], menuShortcuts: true, compoundArchive: true }, async fixture => {
+  await fixture.scan();
+  const job = await fixture.archive();
+  assert.equal(job.phase, 'error');
+  assert.equal(A.counts(job).pending, 1);
+  assert.deepEqual(fixture.attempts, []);
 }));
 
 test('Turkish labels and a secondary account remain correctly scoped', () => using({ language: 'tr', ids: ['p1', 'p2'] }, async fixture => {

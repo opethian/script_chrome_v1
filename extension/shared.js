@@ -36,9 +36,15 @@
   function matches(type, value) {
     const label = normalize(value);
     if (normalized[type]?.has(label)) return true;
-    // Navigation tooltips may append a keyboard hint; archive actions still
-    // require an exact label, so Archive cannot match Unarchive or Delete.
+    // Navigation tooltips may append a keyboard hint.
     if (type === 'previous' || type === 'next') return normalized[type].has(label.replace(/\s*(?:\([^)]*\)|\[[^\]]*\])$/, '').trim());
+    if (type === 'archive' || type === 'unarchive') {
+      // Photos renders the command and its localized Shift+A caption in one
+      // menu row. Remove only that known shortcut and still require the entire
+      // remaining command to match; never use a substring such as "archive".
+      const command = label.replace(/\s*[\[(]?\s*(?:shift|üst\s*karakter|skift|umschalt|maj(?:uscule)?|⇧)\s*\+?\s*a\s*[\])]?\s*$/u, '').trim();
+      return normalized[type].has(command);
+    }
     return false;
   }
   const api = { route, counts, normalize, labels, matches, jobKey: 'albumArchiverJob' };

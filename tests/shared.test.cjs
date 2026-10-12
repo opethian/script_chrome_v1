@@ -28,6 +28,16 @@ test('localized archive labels are exact and cannot select delete or unarchive',
 test('in-flight operations are counted as uncertain, never archived', () => {
   assert.deepEqual(A.counts({ photos: [{ status: 'archived' }, { status: 'already-archived' }, { status: 'pending' }, { status: 'processing' }, { status: 'uncertain' }] }), { total: 5, archived: 1, alreadyArchived: 1, pending: 1, uncertain: 2 });
 });
+test('localized shortcut captions preserve Archive and Unarchive command identity', () => {
+  for (const caption of ['ArşivleÜst Karakter+A', 'Arşivle\nÜst karakter + A', 'Archive Shift+A', 'Archive (Shift + A)', 'Arkivera Skift+A', 'Archivieren Umschalt+A', 'Archiver Maj+A', 'Archive ⇧A']) {
+    assert.equal(A.matches('archive', caption), true, caption);
+  }
+  for (const caption of ['Unarchive Shift+A', 'Arşivden çıkar Üst Karakter+A', 'Remove from archiveShift+A']) {
+    assert.equal(A.matches('archive', caption), false, caption);
+    assert.equal(A.matches('unarchive', caption), true, caption);
+  }
+  for (const caption of ['Delete Shift+A', 'Archive and delete Shift+A', 'Move to trash Shift+A', 'Archive Ctrl+A', 'Shift+A']) assert.equal(A.matches('archive', caption), false, caption);
+});
 test('manifest assets exist and privileges are limited to the Photos workflow', () => {
   const root = path.join(__dirname, '../extension');
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json')));

@@ -19,7 +19,7 @@
     const roots = [document];
     for (let index = 0; index < roots.length && index < 100; index++) {
       const root = roots[index];
-      const selector = 'button,[role="button"],[role="menuitem"]' + (forNavigation ? ',[aria-label],[aria-labelledby],[aria-keyshortcuts],[data-tooltip],[title]' : '');
+      const selector = 'button,[role="button"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"]' + (forNavigation ? ',[aria-label],[aria-labelledby],[aria-keyshortcuts],[data-tooltip],[title]' : ',[role="menu"] [tabindex],[role="menu"] [jsaction*="click"]');
       found.push(...root.querySelectorAll(selector));
       for (const element of root.querySelectorAll('*')) if (element.shadowRoot) roots.push(element.shadowRoot);
     }
@@ -28,7 +28,9 @@
   function names(element) {
     const scope = element.getRootNode();
     const referenced = (element.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(id => (scope.getElementById?.(id) || document.getElementById(id))?.textContent || '').join(' ');
-    return [element.getAttribute('aria-label'), referenced, element.getAttribute('title'), element.getAttribute('data-tooltip'), element.innerText || element.textContent].filter(Boolean);
+    const caption = element.cloneNode(true);
+    for (const decoration of caption.querySelectorAll('[hidden],[aria-hidden="true"],svg,img,kbd')) decoration.remove();
+    return [element.getAttribute('aria-label'), referenced, element.getAttribute('title'), element.getAttribute('data-tooltip'), element.innerText || element.textContent, caption.textContent].filter(Boolean);
   }
   function matching(type, onlyVisible = true) {
     const forNavigation = type === 'previous' || type === 'next';
@@ -108,7 +110,7 @@
           await sleep(100);
           ensurePhoto(expected);
         }
-        throw new Error('Archive / Unarchive was not found in the photo menu. Check the Photos interface language.');
+        throw new Error('The Archive / Unarchive command could not be identified in this photo menu. No archive action was sent.');
       }
       await sleep(100);
     }
