@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Google Photos Album Archiver",
+  "version": "1.0.0",
+  "description": "Scan an open Google Photos album and archive its photos with progress, verification, and a stop button.",
+  "permissions": ["storage", "tabs", "debugger"],
+  "host_permissions": ["https://photos.google.com/*"],
+  "action": { "default_title": "Album Archiver", "default_popup": "popup.html" },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["https://photos.google.com/*"],
+    "js": ["shared.js", "content.js"],
+    "run_at": "document_idle"
+  }],
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" }
+}
